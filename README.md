@@ -29,6 +29,89 @@
 - [📄 License](#-license)
 
 ---
+# Logic_Document.md
+
+## 📌 Purpose
+This document explains the internal logic behind two custom features of the **Collaborative Task Board** project:
+- Smart Assign
+- Conflict Handling
+
+These features enhance user collaboration and reliability of task management in real-time environments.
+
+---
+
+## 🧠 Smart Assign Logic
+
+### 🎯 Goal:
+Automatically assign a task to the user with the **fewest currently active tasks** (tasks not marked as Done).
+
+### ✅ How It Works:
+1. When the "Smart Assign" button is clicked on a task card:
+   - The frontend triggers a request to the backend to perform smart assignment.
+
+2. The backend:
+   - Queries all users who are part of the board.
+   - For each user, it calculates the number of their **active tasks** (status: Todo or In Progress).
+   - Compares the task counts.
+
+3. It selects the user with the **lowest task count**.
+   - In case of a tie, the system picks the first user by creation time or ID.
+
+4. The task is assigned to the selected user.
+5. A WebSocket event is emitted to update all connected clients live.
+6. An activity log entry is recorded: `Task 'X' assigned to user Y using Smart Assign.`
+
+### 📘 Example:
+If 3 users have active tasks:
+- Alice: 3
+- Bob: 1
+- Charlie: 2
+
+Then Smart Assign will assign the task to **Bob**.
+
+---
+
+## 🔄 Conflict Handling Logic
+
+### 🎯 Goal:
+Detect when **two or more users** try to edit the same task at the same time, and allow resolution without data loss.
+
+### ✅ How It Works:
+1. Each task includes a `lastUpdated` timestamp in the database.
+
+2. When a user opens a task for editing:
+   - Their frontend stores the current timestamp.
+
+3. When the same user tries to save changes:
+   - The frontend sends the updated task **along with the original timestamp** to the backend.
+
+4. The backend:
+   - Compares the sent timestamp with the current `lastUpdated` value in the database.
+
+5. If timestamps match:
+   - No conflict → task updates are saved normally.
+
+6. If timestamps **don’t match**:
+   - A conflict is detected → both versions (user version and latest server version) are returned to the frontend.
+
+7. The frontend displays a **merge conflict modal**:
+   - Users can select which fields to keep or overwrite.
+   - Users can accept one version or merge field-by-field.
+
+8. Once resolved:
+   - The final version is saved to the DB.
+   - A WebSocket broadcast sends the updated task to all connected clients.
+   - An activity log is recorded: `Conflict resolved on task 'X' by user Y.`
+
+### 📘 Example:
+- User A opens Task #12 and sees title = "Fix UI bug"
+- At the same time, User B edits Task #12 and changes it to "Fix header alignment"
+- User A submits "Fix login button"
+- The backend detects conflict and returns both versions
+- User A sees a popup to compare versions and resolve it
+
+---
+
 
 ## ✨ Overview
 
